@@ -805,6 +805,7 @@ def run_inference(
 
     # Resolve settings: CLI override > YAML execution block > defaults
     execution_cfg = prepared.get("execution", {})
+    timeout = execution_cfg.get("timeout")  # None = config.py 기본값 사용
     if execution_mode is None:
         execution_mode = execution_cfg.get("mode", prepared.get("execution_mode", "subprocess"))
     if max_retries is None:
@@ -836,6 +837,8 @@ def run_inference(
     print(f"   Resume max rounds:  {resume_max_rounds} (re-run failed tasks)")
     print(f"   Tokens:             code={tokens_cfg['code_generation']}, "
           f"qa={tokens_cfg['qa_check']}, render={tokens_cfg['json_render']}")
+    if timeout:
+        print(f"   Timeout:            {timeout}s (YAML override)")
 
     # QA config
     qa_cfg = condition.get("qa", {})
@@ -882,7 +885,7 @@ def run_inference(
 
     # 3. Initialize executor (no silent fallback — fail loudly)
     try:
-        executor = TaskExecutor(mode=execution_mode, llm_client=client, tokens=tokens_cfg)
+        executor = TaskExecutor(mode=execution_mode, llm_client=client, tokens=tokens_cfg, timeout=timeout)
     except Exception as e:
         print(f"❌ Executor init failed for mode '{execution_mode}': {e}")
         print(f"   Fix the issue or change execution.mode in your YAML config.")

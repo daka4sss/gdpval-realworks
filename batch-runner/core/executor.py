@@ -29,6 +29,7 @@ class TaskExecutor:
         endpoint: Optional[str] = None,
         prompt_name: Optional[str] = None,
         tokens: Optional[dict] = None,
+        timeout: Optional[int] = None,
     ):
         """
         Initialize executor with specified mode.
@@ -40,6 +41,7 @@ class TaskExecutor:
             endpoint: Azure OpenAI endpoint (optional, for code_interpreter)
             prompt_name: Prompt YAML name for subprocess mode (default: subprocess_occupation_codegen)
             tokens: Optional token limit overrides
+            timeout: Subprocess timeout override in seconds (None = config default)
 
         Raises:
             ValueError: If required parameters are missing for the selected mode
@@ -65,6 +67,7 @@ class TaskExecutor:
                 llm_client,
                 prompt_name=prompt_name or SubprocessRunner.DEFAULT_PROMPT,
                 max_completion_tokens=self.tokens.get("code_generation"),
+                timeout=timeout,
             )
 
         elif mode == "json_renderer":

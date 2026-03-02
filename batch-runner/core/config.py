@@ -10,6 +10,7 @@ Usage:
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
+import os
 
 
 # ─── Paths ────────────────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ PROMPT_PRESETS = {
 
 # ─── Batch Pipeline ───────────────────────────────────────────────────────
 
-SUBPROCESS_TIMEOUT = 570  # subprocess mode: max seconds per code execution (9min 30s)
+SUBPROCESS_TIMEOUT = int(os.getenv("SUBPROCESS_TIMEOUT", "570"))  # subprocess mode: env override supported
 
 # Azure AI 모델 (모두 AzureOpenAI SDK로 호출)
 SUPPORTED_MODELS = [

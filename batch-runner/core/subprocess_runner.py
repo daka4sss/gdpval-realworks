@@ -37,6 +37,7 @@ class SubprocessRunner:
         llm_client,
         prompt_name: str = DEFAULT_PROMPT,
         max_completion_tokens: Optional[int] = None,
+        timeout: Optional[int] = None,
     ):
         """
         Initialize Subprocess runner with LLM client.
@@ -45,6 +46,7 @@ class SubprocessRunner:
             llm_client: AzureOpenAI client instance for code generation
             prompt_name: Name of prompt YAML file in prompts/ (without .yaml)
             max_completion_tokens: Completion token cap override
+            timeout: Subprocess timeout override in seconds (default: SUBPROCESS_TIMEOUT)
         """
         self.llm_client = llm_client
         self.prompt_name = prompt_name
@@ -54,6 +56,7 @@ class SubprocessRunner:
             if max_completion_tokens is not None
             else DEFAULT_TOKENS["code_generation"]
         )
+        self.timeout = timeout or SUBPROCESS_TIMEOUT
 
     def run(
         self,
@@ -169,6 +172,15 @@ class SubprocessRunner:
         cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
         return cleaned
 
+    def _sanitize_code(self, code: str) -> str:
+        """Strip evaluation harness tags that don't belong in executable code."""
+        return re.sub(
+            r'^\s*CONFIDENCE\s*\[\s*\d+\s*\]\s*$',
+            '',
+            code,
+            flags=re.MULTILINE,
+        ).strip()
+
     def _extract_code(self, text: str) -> Optional[str]:
         """
         Extract Python code from ```python``` code blocks.
@@ -185,7 +197,8 @@ class SubprocessRunner:
 
         if matches:
             # Concatenate all code blocks if multiple
-            return "\n\n".join(m.strip() for m in matches)
+            combined = "\n\n".join(m.strip() for m in matches)
+            return self._sanitize_code(combined)
 
         # Fallback: Try without language specifier
         pattern = r"```\s*\n(.*?)```"
@@ -195,7 +208,7 @@ class SubprocessRunner:
             # Check if it looks like Python code
             code = matches[0].strip()
             if "import" in code or "def " in code or "print" in code:
-                return code
+                return self._sanitize_code(code)
 
         # Fallback: Code block opened but never closed (LLM truncation)
         pattern = r"```python\s*\n(.+)"
@@ -205,7 +218,7 @@ class SubprocessRunner:
             # Remove trailing ``` if partially present
             code = re.sub(r'`{1,3}\s*$', '', code).strip()
             if code:
-                return code
+                return self._sanitize_code(code)
 
         return None
 
@@ -287,7 +300,7 @@ class SubprocessRunner:
                     env=safe_env,
                     capture_output=True,
                     text=True,
-                    timeout=SUBPROCESS_TIMEOUT,
+                    timeout=self.timeout,
                     preexec_fn=_set_memory_limit,
                 )
 
@@ -330,7 +343,7 @@ class SubprocessRunner:
                     "success": False,
                     "text": "",
                     "files": [],
-                    "error": f"Code execution timeout ({SUBPROCESS_TIMEOUT} seconds exceeded)"
+                    "error": f"Code execution timeout ({self.timeout} seconds exceeded)"
                 }
 
             except Exception as e:

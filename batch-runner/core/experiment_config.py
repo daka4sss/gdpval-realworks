@@ -94,6 +94,7 @@ class ExecutionConfig:
     resume_max_rounds: int = 3     # progress.json error 태스크 자동 재실행 라운드
     install_libreoffice: bool = False  # LibreOffice + Noto Sans 설치 (Elicit용)
     tokens: Dict[str, int] = field(default_factory=lambda: dict(DEFAULT_TOKENS))
+    timeout: Optional[int] = None  # subprocess timeout override (seconds)
 
 
 class ExperimentConfig:
@@ -228,6 +229,7 @@ class ExperimentConfig:
             resume_max_rounds=execution_data.get("resume_max_rounds", 3),
             install_libreoffice=execution_data.get("install_libreoffice", False),
             tokens=execution_tokens,
+            timeout=execution_data.get("timeout"),
         )
 
         return cls(
@@ -327,6 +329,7 @@ class ExperimentConfig:
                 "resume_max_rounds": self.execution.resume_max_rounds,
                 "install_libreoffice": self.execution.install_libreoffice,
                 "tokens": dict(self.execution.tokens),
+                "timeout": self.execution.timeout,
             },
         }
 
