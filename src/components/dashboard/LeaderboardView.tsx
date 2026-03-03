@@ -138,7 +138,6 @@ export default function LeaderboardView({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.2 }}
       className="space-y-6"
     >
@@ -228,11 +227,8 @@ export default function LeaderboardView({
                 const globalRank = (currentPage - 1) * ITEMS_PER_PAGE + idx + 1
                 const badge = getModeBadge(exp.execution_mode)
                 return (
-                  <motion.tr
+                  <tr
                     key={exp.short_id}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
                     onMouseEnter={() => setHoveredRow(exp.short_id)}
                     onMouseLeave={() => setHoveredRow(null)}
                     onClick={() => onSelectExperiment(exp.short_id)}
@@ -292,7 +288,7 @@ export default function LeaderboardView({
                     <td className="px-4 py-3 text-right text-dash-text-secondary font-mono">
                       {exp.success_count}/{exp.total_tasks}
                     </td>
-                  </motion.tr>
+                  </tr>
                 )
               })}
             </tbody>

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Github, Eye, EyeOff, BarChart3, TrendingUp, AlertTriangle, Award, Sun, Moon, HelpCircle } from 'lucide-react'
 import ScopeBadge from '../components/ScopeBadge'
 import LeaderboardView from '../components/dashboard/LeaderboardView'
@@ -94,7 +94,6 @@ export default function Dashboard() {
       className="min-h-screen bg-dash-page"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
       {/* Header */}
@@ -273,20 +272,16 @@ export default function Dashboard() {
               : 'inset 0 1px 4px rgba(0,0,0,0.06)',
           }}
         >
-          <AnimatePresence mode="wait">
-            <div key={activeTab}>
-              {activeTab === 'leaderboard' && (
-                <LeaderboardView
-                  experiments={displayExperiments}
-                  sectorMatrix={sectorMatrix}
-                  onSelectExperiment={handleSelectExperiment}
-                />
-              )}
-              {activeTab === 'trend' && <TrendView experiments={displayExperiments} />}
-              {activeTab === 'errors' && <ErrorAnalysisView experiments={displayExperiments} reports={displayReports} />}
-              {activeTab === 'grading' && <GradingAnalysisView />}
-            </div>
-          </AnimatePresence>
+          {activeTab === 'leaderboard' && (
+              <LeaderboardView
+                experiments={displayExperiments}
+                sectorMatrix={sectorMatrix}
+                onSelectExperiment={handleSelectExperiment}
+              />
+            )}
+            {activeTab === 'trend' && <TrendView experiments={displayExperiments} />}
+            {activeTab === 'errors' && <ErrorAnalysisView experiments={displayExperiments} reports={displayReports} />}
+            {activeTab === 'grading' && <GradingAnalysisView />}
         </div>
       </div>
 

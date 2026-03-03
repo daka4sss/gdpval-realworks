@@ -99,7 +99,6 @@ export default function TrendView({ experiments }: TrendViewProps) {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.2 }}
       className="space-y-6"
     >
@@ -194,12 +193,9 @@ export default function TrendView({ experiments }: TrendViewProps) {
               </tr>
             </thead>
             <tbody>
-              {sortedExps.map((exp, idx) => (
-                <motion.tr
+              {sortedExps.map((exp) => (
+                <tr
                   key={exp.short_id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: idx * 0.04 }}
                   className="border-b border-dash-border-subtle hover:bg-dash-card-hover"
                 >
                   <td className="px-4 py-2">
@@ -217,7 +213,7 @@ export default function TrendView({ experiments }: TrendViewProps) {
                   <td className="px-4 py-2 text-dash-text-secondary">{exp.condition}</td>
                   <td className="px-4 py-2 text-dash-text-muted">{exp.date}</td>
                   <td className="px-4 py-2 text-dash-text-muted">{exp.duration}</td>
-                </motion.tr>
+                </tr>
               ))}
             </tbody>
           </table>
