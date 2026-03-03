@@ -24,8 +24,7 @@
 <p align="center">
   <a href="https://hyeonsangjeon.github.io/gdpval-realworks/">🌐 Live Dashboard</a> · 
   <a href="README_KR.md">🇰🇷 한국어</a> · 
-  <a href="batch-runner/README.md">📖 Batch Runner Docs</a> · 
-  <a href="https://arxiv.org/abs/2510.04374">📄 Paper</a>
+  <a href="batch-runner/README.md">📖 Batch Runner Docs</a>
 </p>
 
 ---
@@ -33,6 +32,12 @@
 > 📊 **[Live Dashboard → https://hyeonsangjeon.github.io/gdpval-realworks/](https://hyeonsangjeon.github.io/gdpval-realworks/)**
 >
 > Leaderboard · Trends · Execution Errors · Grading Analysis — all in one place.
+
+<p align="center">
+  <a href="https://hyeonsangjeon.github.io/gdpval-realworks/">
+    <img src="docs/images/dashboard-leaderboard.png" alt="GDPVal RealWorks Dashboard — Leaderboard with KPI cards, experiment comparison table, and sector heatmap" width="720" />
+  </a>
+</p>
 
 ---
 
