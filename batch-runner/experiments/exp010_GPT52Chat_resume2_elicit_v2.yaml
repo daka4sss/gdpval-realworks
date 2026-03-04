@@ -147,6 +147,7 @@ condition_a:
 # Execution settings
 execution:
   mode: "code_interpreter"     # ★ exp008's subprocess → code_interpreter (only change from exp008)
+  timeout: 720                 # unused by code_interpreter (Azure API manages its own timeout), kept for A/B parity with exp008
   install_libreoffice: true    # LibreOffice + Noto Sans are required for proper PDF generation and font rendering in visual files
   tokens:
     code_generation: 16384
