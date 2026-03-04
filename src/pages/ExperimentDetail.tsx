@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, CheckCircle2, XCircle, RefreshCw,
-  X, Search, Sun, Moon,
+  X, Search, Sun, Moon, Code2, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -13,6 +13,8 @@ import { useReport } from '../hooks/useReports'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useTheme } from '../contexts/ThemeContext'
 import ScopeBadge from '../components/ScopeBadge'
+import { useExperimentPrompt } from '../hooks/useExperimentPrompt'
+import PromptArchitectureView from '../components/dashboard/PromptArchitectureView'
 import type { TaskResult } from '../types/report'
 
 // ── Color helpers ──
@@ -56,6 +58,8 @@ function ExperimentDetail() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortKey, setSortKey] = useState<SortKey>('sector')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [showPromptArch, setShowPromptArch] = useState(false)
+  const { prompt: promptArch } = useExperimentPrompt(id)
 
   // ── Derived data ──
   const meta = report?.meta
@@ -464,6 +468,48 @@ function ExperimentDetail() {
             )}
           </motion.div>
         )}
+
+        {/* ── Prompt Architecture ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.19 }}
+          className="mb-8"
+        >
+          <button
+            onClick={() => setShowPromptArch(!showPromptArch)}
+            className="w-full flex items-center gap-3 px-5 py-4 text-sm font-bold rounded-xl border transition-all duration-200 mb-4 cursor-pointer group
+              bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent
+              dark:border-blue-500/25 dark:hover:border-blue-400/40 border-blue-300 hover:border-blue-400
+              dark:text-blue-200 dark:hover:text-blue-100 text-blue-700 hover:text-blue-800
+              dark:shadow-[0_0_15px_rgba(59,130,246,0.08)] dark:hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]
+              shadow-sm hover:shadow-md"
+          >
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg dark:bg-blue-500/15 dark:group-hover:bg-blue-500/25 bg-blue-100 group-hover:bg-blue-200 transition">
+              <Code2 className="w-4 h-4" />
+            </div>
+            <div className="flex-1 text-left">
+              <span>{showPromptArch ? 'Hide' : 'View'} Prompt Architecture</span>
+              <span className="block text-[11px] font-normal dark:text-blue-400/50 text-blue-500/70">System · User Prompt · QA · Execution Config</span>
+            </div>
+            {showPromptArch ? <ChevronDown className="w-5 h-5 dark:text-blue-400/60 text-blue-500" /> : <ChevronRight className="w-5 h-5 dark:text-blue-400/60 text-blue-500" />}
+          </button>
+          <AnimatePresence>
+            {showPromptArch && promptArch && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-dash-card border border-dash-border rounded-xl p-4">
+                  <PromptArchitectureView prompt={promptArch} shortId={id ?? ''} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
         {/* Task Table */}
         <motion.div

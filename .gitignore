@@ -243,6 +243,9 @@ dist/
 dist-ssr/
 *.local
 
+# Playwright
+test-results/
+
 # Generated files (build-time aggregation)
 public/generated/
 
