@@ -247,4 +247,51 @@ pytest --cov=core --cov-report=html
 
 ## GitHub Actions
 
-파이프라인은 GitHub Actions로 자동화할 수 있습니다. `.github/workflows/batch-run.yml`에서 `workflow_dispatch` 설정으로 Actions 탭에서 수동 트리거하여 전체 Step 0–7 파이프라인을 실행할 수 있습니다.
+**Actions → Run GDPVal Batch Experiment → Run workflow**에서 실행합니다.
+
+### 워크플로우 파라미터
+
+| 파라미터 | 역할 | 기본값 | 언제 바꾸나 |
+|---------|------|--------|-----------|
+| **Experiment YAML filename** | 실행할 실험 파일명 (`.yaml` 제외) | *(필수)* | 항상 입력 |
+| **Experiment name** | PR 제목에 표시할 이름. 비워두면 YAML에서 자동 추출 | *(비움)* | 보통 비워두기 |
+| **Dry run** | HF 업로드 + PR 생성 건너뛰기 (테스트 모드) | `false` | ✅ 첫 테스트 시 체크 |
+| **Relay run number** | **🚫 건드리지 마세요.** 이어달리기 내부 카운터. 파이프라인이 자동 증가시킴. | `0` | **절대 안 바꿈** — 자동 관리 |
+| **Wall-clock timeout** | Step 2가 checkpoint 저장 후 이어달리기를 트리거하기까지의 시간(분). `0` = 제한 없음. | `0` | `code_interpreter` 실험은 `270` 입력 |
+
+### 예시: subprocess 실험 (exp008)
+
+```
+Experiment YAML filename:  exp008_GPT52Chat_resume2_elicit_v2
+Dry run:                   ☐
+Relay run number:          0   ← 건드리지 마세요
+Wall-clock timeout:        0   ← 불필요 (~3시간이면 끝남)
+```
+
+### 예시: code_interpreter 실험 (exp010)
+
+```
+Experiment YAML filename:  exp010_GPT52Chat_resume2_elicit_v2
+Dry run:                   ☐
+Relay run number:          0   ← 건드리지 마세요
+Wall-clock timeout:        270 ← 필수 (4.5시간, 6시간 job 제한 대비)
+```
+
+### 이어달리기(Relay Run) 동작 원리
+
+`code_interpreter` 실험은 6시간 이상 걸릴 수 있어 GitHub Actions 6시간 제한을 초과합니다. 이어달리기 메커니즘이 이를 자동 처리합니다:
+
+```
+Run 1 (직접 트리거):
+  → 태스크 1~150 실행 → 4.5시간 wall timeout 도달
+  → HuggingFace에 checkpoint 저장
+  → Run 2 자동 트리거 (relay_run=1)
+
+Run 2 (자동 트리거):
+  → HuggingFace에서 checkpoint 복원
+  → 태스크 151~220 실행 → 완료
+  → Step 3~7 정상 진행 → PR 생성
+```
+
+- **최대 3회 이어달리기** (안전 장치). 3회 후에도 미완료 시 수동 개입 필요.
+- `subprocess` 실험(~3시간)은 이어달리기 불필요 — `wall_timeout=0` 유지.

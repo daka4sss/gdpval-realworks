@@ -250,4 +250,51 @@ Default: `-m "not integration"` — integration tests are skipped by default.
 
 ## GitHub Actions
 
-The pipeline can be automated via GitHub Actions. See `.github/workflows/batch-run.yml` for the `workflow_dispatch` configuration that runs the full Step 0–7 pipeline with manual trigger from the Actions tab.
+The pipeline runs via GitHub Actions (`workflow_dispatch`). Go to **Actions → Run GDPVal Batch Experiment → Run workflow**.
+
+### Workflow Parameters
+
+| Parameter | What it does | Default | When to change |
+|-----------|-------------|---------|----------------|
+| **Experiment YAML filename** | Which experiment to run (without `.yaml`) | *(required)* | Always fill this |
+| **Experiment name** | Display name for PR title. Leave empty = auto-extract from YAML | *(empty)* | Usually leave empty |
+| **Dry run** | Skip HF upload + PR creation (test mode) | `false` | ✅ Check on first test run |
+| **Relay run number** | **🚫 Don't touch.** Internal counter for relay continuation. Auto-incremented by the pipeline. | `0` | **Never** — auto-managed |
+| **Wall-clock timeout** | Minutes before Step 2 saves a checkpoint and triggers a relay continuation. `0` = no limit. | `0` | Set to `270` for `code_interpreter` experiments |
+
+### Example: subprocess experiment (exp008)
+
+```
+Experiment YAML filename:  exp008_GPT52Chat_resume2_elicit_v2
+Dry run:                   ☐
+Relay run number:          0   ← don't touch
+Wall-clock timeout:        0   ← not needed (finishes in ~3h)
+```
+
+### Example: code_interpreter experiment (exp010)
+
+```
+Experiment YAML filename:  exp010_GPT52Chat_resume2_elicit_v2
+Dry run:                   ☐
+Relay run number:          0   ← don't touch
+Wall-clock timeout:        270 ← required (4.5h, prevents 6h job timeout)
+```
+
+### How Relay Runs Work
+
+`code_interpreter` experiments can take 6+ hours — exceeding the GitHub Actions 6-hour job limit. The relay mechanism handles this automatically:
+
+```
+Run 1 (you trigger):
+  → Runs tasks 1–150 → hits 4.5h wall timeout
+  → Saves checkpoint to HuggingFace
+  → Auto-triggers Run 2 (relay_run=1)
+
+Run 2 (auto-triggered):
+  → Restores checkpoint from HuggingFace
+  → Runs tasks 151–220 → completes
+  → Steps 3–7 run normally → PR created
+```
+
+- **Max 3 relay runs** (safety limit). If the experiment still isn't done after 3 relays, it stops and requires manual intervention.
+- `subprocess` experiments (~3h) don't need relay — leave `wall_timeout=0`.
