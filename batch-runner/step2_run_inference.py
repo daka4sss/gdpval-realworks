@@ -51,7 +51,10 @@ from core.prompt_builder import PromptBuilder, PromptConfig as BuilderPromptConf
 
 # ── Constants ──────────────────────────────────────────────────────────────
 
-RETRIABLE_STATUSES = {"error", "qa_failed"}
+RETRIABLE_STATUSES = {"error", "qa_failed", "pending"}
+
+# Exit code convention
+EXIT_CHECKPOINT = 42  # checkpoint saved, relay retrigger needed
 
 # temperature=0 미지원 모델 캐시 (런타임에 학습, 세션 내 재사용)
 _MODELS_NO_TEMPERATURE: set = set()
@@ -777,8 +780,14 @@ def run_inference(
     condition_key: str = "condition_a",
     resume_max_rounds: int = None,
     verbose: bool = False,
+    wall_timeout: int = None,
 ):
     """Run inference for all prepared tasks with multi-round resume.
+
+    Args:
+        wall_timeout: Wall-clock timeout in minutes. When reached, remaining
+            tasks are saved as 'pending' and the process exits with code 42
+            for relay retrigger. None or 0 = no timeout.
 
     Resume rounds automatically re-execute failed tasks from progress.json,
     replacing the error objects in-place on success.
@@ -839,6 +848,12 @@ def run_inference(
           f"qa={tokens_cfg['qa_check']}, render={tokens_cfg['json_render']}")
     if timeout:
         print(f"   Timeout:            {timeout}s (YAML override)")
+
+    # Wall-clock deadline for relay runs
+    wall_deadline = None
+    if wall_timeout and wall_timeout > 0:
+        wall_deadline = time.time() + (wall_timeout * 60)
+        print(f"   Wall timeout:       {wall_timeout}min (relay mode)")
 
     # QA config
     qa_cfg = condition.get("qa", {})
@@ -1133,11 +1148,70 @@ def run_inference(
 
         completed_count = sum(1 for r in progress.get("results", [])
                               if r.get("status") == "success")
+        pending_count = sum(1 for r in progress.get("results", [])
+                            if r.get("status") == "pending")
         failed_count = sum(1 for r in progress.get("results", [])
                            if r.get("status") in RETRIABLE_STATUSES)
         print(f"\n   ♻️  Loaded progress: {completed_count} succeeded, "
-              f"{failed_count} failed, "
+              f"{failed_count} retriable"
+              f"{f' ({pending_count} pending)' if pending_count else ''}, "
               f"round {progress.get('resume_round', 0)}")
+
+        # ── Relay mode: pending tasks from wall-timeout checkpoint ──
+        if pending_count > 0:
+            pending_task_ids = {
+                r["task_id"] for r in progress.get("results", [])
+                if r.get("status") == "pending"
+            }
+            # Remove pending entries — they'll be re-executed below
+            progress["results"] = [
+                r for r in progress["results"] if r.get("status") != "pending"
+            ]
+            remaining_tasks = [t for t in tasks if t["task_id"] in pending_task_ids]
+
+            print(f"\n── Relay Run: {len(remaining_tasks)} pending tasks ──")
+            done_count = len(progress["results"])
+
+            for i, task in enumerate(remaining_tasks):
+                # ── Watchdog: wall-clock timeout check ──
+                if wall_deadline and time.time() >= wall_deadline:
+                    still_remaining = remaining_tasks[i:]
+                    print(f"\n⏰ Wall timeout reached again ({wall_timeout}min). "
+                          f"Saving checkpoint ({i} more completed, "
+                          f"{len(still_remaining)} still pending)...")
+                    for rt in still_remaining:
+                        progress["results"].append({
+                            "task_id": rt["task_id"],
+                            "status": "pending",
+                            "error": "wall_timeout",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        })
+                    _save_progress(
+                        experiment_id, condition_name, execution_mode,
+                        total, progress["results"], started_at, progress_path,
+                    )
+                    print(f"   💾 Checkpoint saved to {progress_path}")
+                    sys.exit(EXIT_CHECKPOINT)
+
+                task_id = task["task_id"]
+                print(f"   [{done_count + i + 1}/{total}] {task_id} "
+                      f"({task['sector']}/{task['occupation']})...",
+                      end=" ", flush=True)
+
+                result = _run_task_with_qa(task)
+                progress["results"].append(result)
+                _print_status(result)
+
+                if (i + 1) % 20 == 0:
+                    gc.collect()
+
+                _save_progress(
+                    experiment_id, condition_name, execution_mode,
+                    total, progress["results"], started_at, progress_path,
+                )
+
+            # After relay, set progress so we skip to resume rounds
+            # (progress is now not None, so initial run block is skipped)
 
     if progress is None:
         # === INITIAL RUN: 모든 태스크 실행 ===
@@ -1153,6 +1227,26 @@ def run_inference(
         }
 
         for i, task in enumerate(tasks):
+            # ── Watchdog: wall-clock timeout check ──
+            if wall_deadline and time.time() >= wall_deadline:
+                remaining = tasks[i:]
+                print(f"\n⏰ Wall timeout reached ({wall_timeout}min). "
+                      f"Saving checkpoint ({i}/{total} completed, "
+                      f"{len(remaining)} pending)...")
+                for remaining_task in remaining:
+                    progress["results"].append({
+                        "task_id": remaining_task["task_id"],
+                        "status": "pending",
+                        "error": "wall_timeout",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    })
+                _save_progress(
+                    experiment_id, condition_name, execution_mode,
+                    total, progress["results"], started_at, progress_path,
+                )
+                print(f"   💾 Checkpoint saved to {progress_path}")
+                sys.exit(EXIT_CHECKPOINT)
+
             task_id = task["task_id"]
             print(f"   [{i+1}/{total}] {task_id} "
                   f"({task['sector']}/{task['occupation']})...",
@@ -1300,6 +1394,11 @@ def main():
         "--verbose", action="store_true",
         help="Print detailed debug info about API response structure (code_interpreter mode)",
     )
+    parser.add_argument(
+        "--wall-timeout", type=int, default=None,
+        help="Wall-clock timeout in minutes. When reached, save checkpoint and "
+             "exit with code 42 for relay retrigger. (default: None = no timeout)",
+    )
     args = parser.parse_args()
 
     run_inference(
@@ -1309,6 +1408,7 @@ def main():
         condition_key=args.condition,
         resume_max_rounds=args.resume_max_rounds,
         verbose=args.verbose,
+        wall_timeout=args.wall_timeout,
     )
 
 

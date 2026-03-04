@@ -8,7 +8,7 @@ set -euo pipefail
 #   ./step2_run_inference.sh condition_a --no-resume   # extra args
 
 CONDITION="${1:-condition_a}"
-EXTRA_ARGS="${@:2}"
+shift || true  # Safely shift remaining arguments for proper passing to Python
 
 cd "$(dirname "$0")"
 
@@ -16,9 +16,9 @@ echo "============================================================"
 echo "🚀 Step 2: Run Inference"
 echo "   Condition: $CONDITION"
 echo "   (mode & max_retries from YAML execution: section)"
-if [ -n "$EXTRA_ARGS" ]; then
-echo "   CLI overrides: $EXTRA_ARGS"
+if [ $# -gt 0 ]; then
+echo "   CLI overrides: $@"
 fi
 echo "============================================================"
 
-python step2_run_inference.py --condition "$CONDITION" $EXTRA_ARGS
+python3 step2_run_inference.py --condition "$CONDITION" "$@"
