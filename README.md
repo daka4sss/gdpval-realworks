@@ -241,16 +241,24 @@ Self-QA checks: Are all requirements met? Are files actually produced? Is the ou
 
 ## 🖥️ Dashboard
 
-> ⏳ **Grading results are currently in progress.** The dashboard will be populated once [evals.openai.com](https://evals.openai.com/) finishes scoring — this can take a while.
+> **[→ Live Dashboard](https://hyeonsangjeon.github.io/gdpval-realworks/)**
 
-The React dashboard at [hyeonsangjeon.github.io/gdpval-realworks](https://hyeonsangjeon.github.io/gdpval-realworks/) shows:
+Interactive experiment analytics — leaderboard, sector heatmaps, error analysis, prompt architecture viewer.
 
-- 📊 **Experiment overview** — all runs with status and metadata
-- 📈 **Grade summaries** — per-model scores across all tasks
-- 🔍 **Detailed views** — drill into individual task results
-- ⚖️ **Comparison** — side-by-side model performance
+| Feature | Description |
+|---------|-------------|
+| **Leaderboard** | Ranked experiments with strategy, success rate, QA scores |
+| **Sector Heatmap** | 9 sectors × N experiments success rate matrix |
+| **Trends** | Success rate / QA / latency trend lines across experiments |
+| **Execution Errors** | Error distribution, recovery funnel, CONFIDENCE NameError tracking |
+| **Prompt Viewer** | See exactly what prompt was sent to the LLM — system, user, QA, config |
+| **Grading** | External evaluation scores (OpenAI Evals) |
+| **Experiment Detail** | Drill into 220 tasks — filter by sector, status, search |
 
-Data is aggregated at build time from `data/` → static JSON → served by Vite.
+Built with React 18 + TypeScript + Vite + Tailwind + Recharts + Framer Motion.  
+Deployed automatically to GitHub Pages on every push to `main`.
+
+📖 **[Dashboard Documentation →](src/README.md)** · 🇰🇷 **[한국어 →](src/README_KR.md)**
 
 ---
 
