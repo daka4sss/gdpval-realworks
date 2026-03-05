@@ -82,6 +82,32 @@ function getHeatmapColor(rate: number, isDark: boolean): { bg: string; text: str
   return { bg, text }
 }
 
+/** Continuous heatmap color for QA score: red → amber → emerald (0 → 10) */
+function getQAHeatmapColor(score: number, isDark: boolean): { bg: string; text: string } {
+  const clamped = Math.max(0, Math.min(10, score))
+  const t = clamped / 10 // 0..1
+
+  let r: number, g: number, b: number
+  if (t < 0.5) {
+    const p = t / 0.5
+    r = Math.round(220 + (245 - 220) * p)
+    g = Math.round(38 + (158 - 38) * p)
+    b = Math.round(38 + (11 - 38) * p)
+  } else {
+    const p = (t - 0.5) / 0.5
+    r = Math.round(245 + (16 - 245) * p)
+    g = Math.round(158 + (185 - 158) * p)
+    b = Math.round(11 + (129 - 11) * p)
+  }
+
+  const alpha = isDark ? 0.35 : 0.25
+  const bg = `rgba(${r},${g},${b},${alpha})`
+  const text = isDark
+    ? `rgb(${Math.min(r + 60, 255)},${Math.min(g + 60, 255)},${Math.min(b + 60, 255)})`
+    : `rgb(${Math.max(r - 80, 0)},${Math.max(g - 80, 0)},${Math.max(b - 40, 0)})`
+  return { bg, text }
+}
+
 export default function LeaderboardView({
   experiments,
   sectorMatrix,
@@ -92,6 +118,7 @@ export default function LeaderboardView({
   const [modeFilter, setModeFilter] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [hoveredCell, setHoveredCell] = useState<string | null>(null)
+  const [heatmapMode, setHeatmapMode] = useState<'qa' | 'rate'>('qa')
   const { isDark } = useTheme()
 
   // Unique filter options
@@ -335,7 +362,28 @@ export default function LeaderboardView({
       <div className="rounded-xl bg-dash-card border border-dash-border overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b border-dash-border flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-dash-text">Success Rate by Sector</h3>
+          <div className="flex items-center gap-1 rounded-lg bg-dash-card-hover p-0.5">
+            <button
+              onClick={() => setHeatmapMode('qa')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                heatmapMode === 'qa'
+                  ? 'bg-amber-500/15 text-amber-300 shadow-sm'
+                  : 'text-dash-text-muted hover:text-dash-text-secondary'
+              }`}
+            >
+              Self-QA Score
+            </button>
+            <button
+              onClick={() => setHeatmapMode('rate')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                heatmapMode === 'rate'
+                  ? 'bg-emerald-500/15 text-emerald-300 shadow-sm'
+                  : 'text-dash-text-muted hover:text-dash-text-secondary'
+              }`}
+            >
+              Success Rate
+            </button>
+          </div>
           {/* Legend */}
           <div className="flex items-center gap-2 text-[10px] text-dash-text-muted">
             <span>Low</span>
@@ -348,6 +396,7 @@ export default function LeaderboardView({
               }}
             />
             <span>High</span>
+            <span className="ml-1">({heatmapMode === 'qa' ? '0–10' : '0–100%'})</span>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -399,9 +448,16 @@ export default function LeaderboardView({
                     {sector}
                   </td>
                   {filtered.map((exp) => {
-                    const rate =
-                      sectorMatrix[sector]?.[exp.short_id]?.success_rate_pct ?? 0
-                    const { bg, text } = getHeatmapColor(rate, isDark)
+                    const cellData = sectorMatrix[sector]?.[exp.short_id]
+                    const value = heatmapMode === 'qa'
+                      ? (cellData?.avg_qa_score ?? 0)
+                      : (cellData?.success_rate_pct ?? 0)
+                    const { bg, text } = heatmapMode === 'qa'
+                      ? getQAHeatmapColor(value, isDark)
+                      : getHeatmapColor(value, isDark)
+                    const displayValue = heatmapMode === 'qa'
+                      ? value.toFixed(1)
+                      : (value % 1 === 0 ? `${value}%` : `${value.toFixed(1)}%`)
                     const cellKey = `${sector}-${exp.short_id}`
                     const isHovered = hoveredCell === cellKey
                     return (
@@ -421,7 +477,7 @@ export default function LeaderboardView({
                         onMouseEnter={() => setHoveredCell(cellKey)}
                         onMouseLeave={() => setHoveredCell(null)}
                       >
-                        {rate % 1 === 0 ? `${rate}%` : `${rate.toFixed(1)}%`}
+                        {displayValue}
                       </td>
                     )
                   })}

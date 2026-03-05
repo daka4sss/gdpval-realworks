@@ -52,6 +52,17 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
+      # ── System deps for native Python packages (pycairo/pygraphviz, etc.) ──
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libcairo2-dev \
+            libffi-dev \
+            graphviz \
+            libgraphviz-dev
+
       - name: Install dependencies
         run: |
           pip install -r batch-runner/requirements.txt
