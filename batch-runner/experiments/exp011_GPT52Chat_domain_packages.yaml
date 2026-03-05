@@ -1,5 +1,5 @@
 # Experiment Configuration
-# exp010 — exp008 base + TASK29 domain packages + package notice in suffix
+# exp011 — exp008 base + TASK29 domain packages + package notice in suffix
 # Based on exp008 (Elicit v2, resume_max_rounds: 2) with:
 #   - UK BEIS domain packages installed (audio, document, ML, NLP, GIS, vision)
 #   - System deps added (ffmpeg, libsndfile, tesseract, poppler, etc.)
@@ -7,7 +7,7 @@
 # If condition_b is absent, automatically runs as Single Test
 
 experiment:
-  id: "exp010_GPT52Chat_domain_packages"
+  id: "exp011_GPT52Chat_domain_packages"
   name: "GPT-5.2 Chat Elicit v2 — domain packages + package notice (Full 220)"
   description: "exp008 base + UK BEIS domain packages (~80 Python + system deps) + suffix package notice. Tests whether domain package availability + LLM awareness improves error tasks (e.g., wave.Error on 24-bit WAV)."
   author: "Hyeonsang Jeon"
@@ -26,7 +26,7 @@ control:
 
 # Data filter
 data:
-  source: "HyeonSang/exp010_GPT52Chat_domain_packages"
+  source: "HyeonSang/exp011_GPT52Chat_domain_packages"
   filter:
     sector: null
     occupation: null
