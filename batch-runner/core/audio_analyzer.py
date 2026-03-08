@@ -22,12 +22,17 @@ Usage (called by step2_run_inference._run_preprocessors):
 from __future__ import annotations
 
 import base64
+import json
 import os
 import time
 from pathlib import Path
 from typing import List, Optional
 
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".aiff"}
+
+# Size limits for audio API calls (base64-encoded MB)
+MAX_TOTAL_BASE64_MB = 50   # batch all files if total ≤ this
+MAX_SINGLE_FILE_MB = 50    # skip individual files exceeding this
 
 
 def _audio_format(path: str) -> str:
@@ -51,7 +56,7 @@ def filter_audio_files(file_paths: List[str] | None) -> List[str]:
     return [p for p in file_paths if Path(p).suffix.lower() in AUDIO_EXTENSIONS]
 
 
-def analyze_audio_files(
+def _analyze_batch(
     client,
     model_deployment: str,
     system_prompt: str,
@@ -59,24 +64,10 @@ def analyze_audio_files(
     task_instruction: Optional[str] = None,
     max_completion_tokens: int = 4096,
 ) -> str:
-    """Send audio files + task instruction to gpt-audio-1.5 for analysis.
+    """Send one or more audio files in a single API call and return analysis.
 
-    Args:
-        client:           AzureOpenAI (or OpenAI) client instance.
-        model_deployment:  Deployment name, e.g. "gpt-audio-1.5".
-        system_prompt:     System prompt from YAML preprocessor config.
-        audio_paths:       List of absolute paths to audio files.
-        task_instruction:  The task prompt (injected when include_task_instruction=true).
-        max_completion_tokens: Max tokens for the analysis response.
-
-    Returns:
-        "[AUDIO ANALYSIS]\\n<json>\\n[/AUDIO ANALYSIS]" on success,
-        empty string on failure (preprocessor errors must not block main execution).
+    Returns "[AUDIO ANALYSIS]\\n<json>\\n[/AUDIO ANALYSIS]" or "" on failure.
     """
-    if not audio_paths:
-        return ""
-
-    # Build user content: text + audio parts
     text_content = system_prompt
     if task_instruction:
         text_content += f"\n\n[TASK]\n{task_instruction}\n[/TASK]"
@@ -102,13 +93,10 @@ def analyze_audio_files(
             print(f"      ⚠️  Audio preprocessor: failed to read {audio_path}: {exc}")
             continue
 
-    # Need at least one audio part beyond the text
     if len(content_parts) < 2:
         return ""
 
-    messages = [
-        {"role": "user", "content": content_parts},
-    ]
+    messages = [{"role": "user", "content": content_parts}]
 
     try:
         start = time.time()
@@ -141,3 +129,90 @@ def analyze_audio_files(
     except Exception as exc:
         print(f"      ⚠️  Audio preprocessor API error (non-fatal): {exc}")
         return ""
+
+
+def analyze_audio_files(
+    client,
+    model_deployment: str,
+    system_prompt: str,
+    audio_paths: List[str],
+    task_instruction: Optional[str] = None,
+    max_completion_tokens: int = 4096,
+) -> str:
+    """Send audio files + task instruction to gpt-audio-1.5 for analysis.
+
+    Handles large multi-file payloads by splitting into per-file API calls
+    when total base64 size exceeds MAX_TOTAL_BASE64_MB.
+
+    Args:
+        client:           AzureOpenAI (or OpenAI) client instance.
+        model_deployment:  Deployment name, e.g. "gpt-audio-1.5".
+        system_prompt:     System prompt from YAML preprocessor config.
+        audio_paths:       List of absolute paths to audio files.
+        task_instruction:  The task prompt (injected when include_task_instruction=true).
+        max_completion_tokens: Max tokens for the analysis response.
+
+    Returns:
+        "[AUDIO ANALYSIS]\\n<json>\\n[/AUDIO ANALYSIS]" on success,
+        empty string on failure (preprocessor errors must not block main execution).
+    """
+    if not audio_paths:
+        return ""
+
+    # Pre-filter by individual file size
+    eligible: list[tuple[str, float]] = []
+    for audio_path in audio_paths:
+        try:
+            size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+        except OSError:
+            print(f"      ⚠️  Audio preprocessor: cannot stat {audio_path}")
+            continue
+        b64_size_mb = size_mb * 4 / 3  # base64 overhead ~33%
+        if b64_size_mb > MAX_SINGLE_FILE_MB:
+            print(
+                f"      ⚠️  Skipping {Path(audio_path).name}: "
+                f"{b64_size_mb:.0f}MB exceeds {MAX_SINGLE_FILE_MB}MB limit"
+            )
+            continue
+        eligible.append((audio_path, b64_size_mb))
+
+    if not eligible:
+        return ""
+
+    total_b64_mb = sum(s for _, s in eligible)
+    paths = [p for p, _ in eligible]
+
+    # ── Small enough → single batch call ──
+    if total_b64_mb <= MAX_TOTAL_BASE64_MB:
+        return _analyze_batch(
+            client, model_deployment, system_prompt,
+            paths, task_instruction, max_completion_tokens,
+        )
+
+    # ── Too large → per-file individual calls, merge results ──
+    print(
+        f"      🎵 Total audio {total_b64_mb:.0f}MB > {MAX_TOTAL_BASE64_MB}MB, "
+        f"analyzing {len(paths)} files individually"
+    )
+    all_analyses: dict = {}
+    for audio_path in paths:
+        result = _analyze_batch(
+            client, model_deployment, system_prompt,
+            [audio_path], task_instruction, max_completion_tokens,
+        )
+        if result:
+            inner = (
+                result
+                .replace("[AUDIO ANALYSIS]\n", "")
+                .replace("\n[/AUDIO ANALYSIS]", "")
+            )
+            try:
+                parsed = json.loads(inner)
+                all_analyses[Path(audio_path).name] = parsed
+            except json.JSONDecodeError:
+                all_analyses[Path(audio_path).name] = inner
+
+    if all_analyses:
+        combined = json.dumps(all_analyses, indent=2, ensure_ascii=False)
+        return f"[AUDIO ANALYSIS]\n{combined}\n[/AUDIO ANALYSIS]"
+    return ""
