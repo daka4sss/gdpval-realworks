@@ -24,6 +24,7 @@
 <p align="center">
   <a href="https://hyeonsangjeon.github.io/gdpval-realworks/">🌐 라이브 대시보드</a> · 
   <a href="README.md">🇺🇸 English</a> · 
+  <a href="README_JP.md">🇯🇵 日本語</a> · 
   <a href="batch-runner/README.md">📖 Batch Runner 문서</a> · 
   <a href="https://arxiv.org/abs/2510.04374">📄 논문</a>
 </p>

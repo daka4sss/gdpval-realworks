@@ -3,6 +3,8 @@
 > GDPVal 벤치마크를 위한 인터랙티브 실험 분석 대시보드.
 > **[→ 라이브 대시보드](https://hyeonsangjeon.github.io/gdpval-realworks/)**
 
+🇺🇸 [English](README.md) · 🇯🇵 [日本語](README_JP.md)
+
 ---
 
 ## 개요

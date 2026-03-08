@@ -3,6 +3,8 @@
 > Interactive experiment analytics for the GDPVal benchmark.
 > **[→ Live Dashboard](https://hyeonsangjeon.github.io/gdpval-realworks/)**
 
+🇰🇷 [한국어](README_KR.md) · 🇯🇵 [日本語](README_JP.md)
+
 ---
 
 ## What This Is
