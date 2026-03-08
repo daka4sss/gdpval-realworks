@@ -116,10 +116,17 @@ def analyze_audio_files(
             model=model_deployment,
             messages=messages,
             max_completion_tokens=max_completion_tokens,
-            response_format={"type": "json_object"},
+            # Note: gpt-audio-1.5 does not support response_format json_object.
+            # JSON output is enforced via system prompt ("Respond with JSON only").
         )
         latency_ms = (time.time() - start) * 1000
-        analysis_json = response.choices[0].message.content or ""
+        raw_content = response.choices[0].message.content or ""
+        # Strip markdown code fences if present (no response_format enforcement)
+        analysis_json = raw_content
+        if "```json" in analysis_json:
+            analysis_json = analysis_json.split("```json")[1].split("```")[0].strip()
+        elif "```" in analysis_json:
+            analysis_json = analysis_json.split("```")[1].split("```")[0].strip()
 
         tokens = response.usage
         print(
