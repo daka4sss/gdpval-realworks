@@ -102,6 +102,8 @@ def prepare_tasks(config_path: str) -> dict:
                 "min_score": cond.qa.min_score,
                 "prompt": cond.qa.prompt,
             }
+        if cond.preprocessors:
+            d["preprocessors"] = cond.preprocessors
         return d
 
     output = {

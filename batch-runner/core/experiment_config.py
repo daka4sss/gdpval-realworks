@@ -44,12 +44,12 @@ class PromptConfig:
 
 @dataclass
 class QAConfig:
-    """Self-QA configuration — LLM이 자기 결과물을 검수"""
+    """Self-QA configuration — LLM inspects its own output"""
     enabled: bool = False
-    max_retries: int = 2           # QA 실패 시 재생성 횟수
-    model: Optional[str] = None    # None = 생성과 같은 모델
-    min_score: int = 6             # 이 점수 미만이면 QA 실패 (1-10)
-    prompt: str = ""               # QA 프롬프트 템플릿
+    max_retries: int = 2           # Number of retries on QA failure
+    model: Optional[str] = None    # None = same model as generation
+    min_score: int = 6             # QA fails if score is below this (1-10)
+    prompt: str = ""               # QA prompt template
 
 
 @dataclass
@@ -59,6 +59,7 @@ class ConditionConfig:
     model: ModelConfig
     prompt: PromptConfig
     qa: Optional[QAConfig] = None
+    preprocessors: Optional[List[Dict[str, Any]]] = None
 
 
 @dataclass
@@ -90,9 +91,9 @@ class ExecutionConfig:
     """Execution mode configuration (Phase 5-3)"""
     mode: Literal["code_interpreter", "subprocess", "json_renderer"] = "subprocess"
     score_type: Literal["tool_assisted", "portable"] = "tool_assisted"
-    max_retries: int = 3           # 태스크 내 인프라 리트라이
-    resume_max_rounds: int = 3     # progress.json error 태스크 자동 재실행 라운드
-    install_libreoffice: bool = False  # LibreOffice + Noto Sans 설치 (Elicit용)
+    max_retries: int = 3           # Infrastructure retries within task execution
+    resume_max_rounds: int = 3     # Auto-retry rounds for error tasks in progress.json
+    install_libreoffice: bool = False  # Install LibreOffice + Noto Sans (for Elicit)
     tokens: Dict[str, int] = field(default_factory=lambda: dict(DEFAULT_TOKENS))
     timeout: Optional[int] = None  # subprocess timeout override (seconds)
 
@@ -280,11 +281,15 @@ class ExperimentConfig:
                 prompt=qa_data.get("prompt", ""),
             )
 
+        # Parse preprocessors (optional — list of dicts, kept as raw YAML)
+        preprocessors = data.get("preprocessors", None)
+
         return ConditionConfig(
             name=data.get("name", "Unnamed"),
             model=model,
             prompt=prompt,
             qa=qa,
+            preprocessors=preprocessors,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -360,6 +365,8 @@ class ExperimentConfig:
                 "min_score": condition.qa.min_score,
                 "prompt": condition.qa.prompt,
             }
+        if condition.preprocessors:
+            d["preprocessors"] = condition.preprocessors
         return d
 
     def validate(self) -> List[str]:

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Step 2: Run Inference — Call LLM for each task, save results incrementally.
 
-Resume 동작:
-  - step2_inference_progress.json에서 error/qa_failed 태스크를 찾아 재실행
-  - resume_max_rounds만큼 반복 (YAML execution.resume_max_rounds)
-  - 성공한 태스크는 progress.json에서 직접 업데이트 (오브젝트 교체)
-  - 모든 라운드 끝나면 최종 결과를 step2_inference_results.json에 저장
+Resume behavior:
+  - Find error/qa_failed tasks in step2_inference_progress.json and retry
+  - Repeat up to resume_max_rounds times (YAML execution.resume_max_rounds)
+  - Update successful tasks directly in progress.json (object replacement)
+  - After all rounds complete, save final results to step2_inference_results.json
 
 Input:
   - workspace/step1_tasks_prepared.json  (from Step 1)
@@ -47,6 +47,7 @@ from core.file_preview import generate_all_previews
 from core.llm_client import create_client, create_provider_client, complete
 from core.needs_files import NeedsFilesManifest
 from core.prompt_builder import PromptBuilder, PromptConfig as BuilderPromptConfig
+from core.audio_analyzer import analyze_audio_files, filter_audio_files
 
 
 # ── Constants ──────────────────────────────────────────────────────────────
@@ -56,8 +57,69 @@ RETRIABLE_STATUSES = {"error", "qa_failed", "pending"}
 # Exit code convention
 EXIT_CHECKPOINT = 42  # checkpoint saved, relay retrigger needed
 
-# temperature=0 미지원 모델 캐시 (런타임에 학습, 세션 내 재사용)
+# Cache of models that don't support temperature=0 (learned at runtime, reused in session)
 _MODELS_NO_TEMPERATURE: set = set()
+
+
+# ── Preprocessor helper ───────────────────────────────────────────────────
+
+def _run_preprocessors(
+    condition: dict,
+    abs_ref_files: list[str] | None,
+    task_instruction: str,
+) -> str:
+    """Run preprocessors defined in condition YAML (e.g. audio_analyzer).
+
+    Returns a prefix string to prepend to the task prompt.
+    If no preprocessors are configured or none triggered, returns "".
+    Preprocessor failure is non-fatal — returns "" so main execution continues.
+    """
+    preprocessors = condition.get("preprocessors", [])
+    if not preprocessors:
+        return ""
+
+    results: list[str] = []
+
+    for pp_cfg in preprocessors:
+        pp_type = pp_cfg.get("type", "")
+        trigger = pp_cfg.get("trigger", "")
+
+        if pp_type == "audio_analyzer":
+            # Check trigger condition
+            if trigger == "has_audio_files":
+                audio_files = filter_audio_files(abs_ref_files)
+                if not audio_files:
+                    continue
+            else:
+                audio_files = filter_audio_files(abs_ref_files)
+                if not audio_files:
+                    continue
+
+            # Create a separate client for the preprocessor model
+            pp_model = pp_cfg.get("model", {})
+            pp_provider = pp_model.get("provider", "azure")
+            pp_deployment = pp_model.get("deployment", "gpt-audio-1.5")
+            pp_system = pp_cfg.get("system", "You are an audio analysis agent.")
+            include_task = pp_cfg.get("include_task_instruction", False)
+
+            try:
+                pp_client = create_provider_client(pp_provider)
+                analysis = analyze_audio_files(
+                    client=pp_client,
+                    model_deployment=pp_deployment,
+                    system_prompt=pp_system,
+                    audio_paths=audio_files,
+                    task_instruction=task_instruction if include_task else None,
+                )
+                if analysis:
+                    results.append(analysis)
+            except Exception as exc:
+                print(f"      ⚠️  Preprocessor '{pp_type}' error (non-fatal): {exc}")
+                continue
+        else:
+            print(f"      ⚠️  Unknown preprocessor type: '{pp_type}' — skipping")
+
+    return "\n\n".join(results)
 
 
 # ── JSON extraction helper ─────────────────────────────────────────────────
@@ -235,7 +297,7 @@ def _try_repair_truncated_json(text: str) -> dict | None:
 
 
 def _extract_essential_fields(text: str) -> dict | None:
-    """JSON 파싱이 완전히 실패했을 때 regex로 필수 필드만 추출."""
+    """Fallback to extract only essential fields via regex when JSON parsing completely fails."""
     score_match = re.search(r'"score"\s*:\s*(\d+)', text)
     passed_match = re.search(r'"passed"\s*:\s*(true|false)', text, re.IGNORECASE)
 
@@ -246,7 +308,7 @@ def _extract_essential_fields(text: str) -> dict | None:
         else:
             passed = score >= 6
 
-        # issues 추출 시도
+        # Attempt to extract issues field
         issues = []
         issues_match = re.search(r'"issues"\s*:\s*\[(.*?)\]', text, re.DOTALL)
         if issues_match:
@@ -262,7 +324,7 @@ def _extract_essential_fields(text: str) -> dict | None:
     return None
 
 
-# ── Self-QA: LLM이 자기 결과물을 검수 ─────────────────────────────────────
+# ── Self-QA: LLM inspects its own output ────────────────────────────────────
 
 
 def _run_self_qa(
@@ -274,15 +336,15 @@ def _run_self_qa(
     qa_max_tokens: int = DEFAULT_TOKENS["qa_check"],
 ) -> dict:
     """
-    LLM이 QA 검수관 역할로 결과물 평가.
+    LLM acts as QA inspector and evaluates the output.
 
     Returns:
         {
-            "passed": bool | None,  # None = undetermined (parse/API 실패)
+            "passed": bool | None,  # None = undetermined (parse/API failure)
             "score": int | None,    # None = undetermined
             "issues": [...],
             "suggestion": str,
-            "undetermined": bool,   # True = QA 판정 불가
+            "undetermined": bool,   # True = QA verdict undetermined
         }
     """
     qa_cfg = condition.get("qa", {})
@@ -294,7 +356,7 @@ def _run_self_qa(
         return {"passed": True, "score": 10, "issues": [], "suggestion": "", "undetermined": False}
 
     # Build QA prompt from template
-    # deliverable_files 경로로 실제 파일 preview 생성
+    # Generate actual file previews from deliverable_files paths
     file_preview_text = ""
     if deliverable_files:
         try:
@@ -306,7 +368,7 @@ def _run_self_qa(
             if abs_paths:
                 preview = generate_all_previews(abs_paths)
                 if preview:
-                    # 파일 preview를 3000자로 제한 (QA 컨텍스트 과다 방지)
+                    # Limit file preview to 3000 chars (prevent QA context bloat)
                     if len(preview) > 3000:
                         preview = preview[:3000] + "\n... (truncated)"
                     file_preview_text = (
@@ -352,7 +414,7 @@ def _run_self_qa(
     ]
 
     try:
-        # temperature=0 지원 여부를 캐시로 판단 (매번 exception 방지)
+        # Check temperature=0 support via cache (prevents repeated exceptions)
         if qa_model in _MODELS_NO_TEMPERATURE:
             response, _ = complete(client, qa_model, qa_messages,
                                    max_completion_tokens=qa_max_tokens)
@@ -370,7 +432,7 @@ def _run_self_qa(
                 else:
                     raise
 
-        # finish_reason 체크 — 응답 잘림 감지
+        # Check finish_reason — detect truncated responses
         finish_reason = getattr(response.choices[0], "finish_reason", None)
         if finish_reason == "length":
             print(f"  ⚠️  QA response truncated (finish_reason=length)")
@@ -594,6 +656,12 @@ def _execute_single_task(
                 print(f"      ⚠️  Reference file not found: {abs_path}")
         if not abs_ref_files:
             abs_ref_files = None  # all missing → treat as no files
+
+    # ── Preprocessor: enrich prompt with audio analysis (if configured) ──
+    preprocessor_prefix = _run_preprocessors(condition, abs_ref_files, instruction)
+    if preprocessor_prefix:
+        instruction = preprocessor_prefix + "\n\n" + instruction
+        print(f"      🎵 Preprocessor injected {len(preprocessor_prefix)} chars into prompt")
 
     try:
         start = time.time()
