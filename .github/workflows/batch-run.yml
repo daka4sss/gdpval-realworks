@@ -134,12 +134,12 @@ jobs:
           import yaml
           with open('$YAML_FILE') as f:
               cfg = yaml.safe_load(f)
-          source = cfg.get('data', {}).get('source', 'HyeonSang/${{ inputs.experiment_yaml }}')
+          source = cfg.get('data', {}).get('source', 'dddsss-newbi/${{ inputs.experiment_yaml }}')
           print(source)
           ")
           REPO_OWNER=$(python3 -c "
           source = '$REPO_SOURCE'
-          owner = source.split('/')[0] if '/' in source else 'HyeonSang'
+          owner = source.split('/')[0] if '/' in source else 'dddsss-newbi'
           print(owner)
           ")
           echo "install_libreoffice=$INSTALL_LO" >> $GITHUB_OUTPUT

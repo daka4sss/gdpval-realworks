@@ -6,7 +6,7 @@ experiment:
   id: "exp013_GPT54_baseline_runner_exec"
   name: "GPT-5.4 Baseline — subprocess (Full 220 tasks)"
   description: "Full baseline run with GPT-5.4 on all 220 tasks. Single condition (condition_a only) with subprocess mode and Self-QA enabled. Compare with exp003 (GPT-5.2 subprocess baseline)."
-  author: "Hyeonsang Jeon"
+  author: "Daiki Kanemitsu"
   created_at: "2026-03-09"
 
 # Variable control
@@ -21,7 +21,7 @@ control:
 
 # Data filter
 data:
-  source: "HyeonSang/exp013_GPT54_baseline_runner_exec"
+  source: "dddsss-newbi/exp013_GPT54_baseline_runner_exec"
   filter:
     sector: null
     occupation: null

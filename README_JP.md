@@ -172,7 +172,7 @@ condition_a:
   name: "Baseline"
   model:
     provider: "azure"
-    deployment: "gpt-5.2-chat"
+    deployment: "gpt-5.4"  # 例: gpt-5.2-chat | gpt-5.4
     temperature: 0.0
     seed: 42
   prompt:
@@ -192,6 +192,8 @@ execution:
 ```
 
 その後、**Actions → Run workflow** で `experiment_yaml: exp001_GPT52Chat_baseline` を指定して実行します。
+
+> 補足: gpt-5.4 は追加対応です。既存の gpt-5.2 実験はそのまま残しつつ、`deployment` を `gpt-5.4` にした新規 YAML で切り替えて使えます。
 
 ---
 
@@ -309,6 +311,8 @@ export AZURE_OPENAI_API_KEY="xxx"
 
 > 💡 ローカル実行も可能ですが、全220タスクを回すなら **GitHub Actions** を推奨します。  
 > バッチワークフローは TPM（1分あたりトークン数）上限の範囲で並列化されるので、重い処理はクラウドに任せるのが実用的です。
+
+> 出力言語ポリシー: データセット本文や入力プロンプトは英語のまま維持し、Step 6 の実験サマリーと結果解釈の narrative のみ日本語で生成します。評価に使う構造化データや JSON キーは変更しません。
 
 ---
 
