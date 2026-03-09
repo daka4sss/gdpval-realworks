@@ -110,6 +110,8 @@ Reads `workspace/result.json` and generates three output files under `workspace/
 
 Narrative sections (overview, quality analysis, failure patterns, recommendations) are
 generated via a single LLM call using the same model as the experiment.
+In this repo's Japan-market setup, those narrative values are emitted in Japanese
+while dataset inputs, task prompts, and structured JSON keys remain unchanged.
 Grading scores are not yet available at this stage — the report focuses on task completion,
 Self-QA scores, latency patterns, and deliverable quality.
 
@@ -138,7 +140,7 @@ condition_a:
   name: "Baseline"
   model:
     provider: "azure"         # azure | openai | anthropic
-    deployment: "gpt-5.2-chat"
+    deployment: "gpt-5.4"  # e.g. gpt-5.2-chat | gpt-5.4
     temperature: 0.0
     seed: 42
   prompt:
@@ -241,7 +243,8 @@ Default: `-m "not integration"` — integration tests are skipped by default.
 
 ## Important Notes
 
-- **o-series models** (`gpt-5.x`, `o3`, `o4`) do not support the `temperature` parameter. Passing `temperature=0` causes a 400 error.
+- **o-series models** (`gpt-5.x`, `o3`, `o4`) may reject the `temperature` parameter. If `temperature=0` causes a 400 error, remove it or retry without it.
+- **GPT-5.4 support**: This repo now accepts `gpt-5.4` as an additional deployment string. Existing defaults stay on `gpt-5.2-chat` so current experiments and tests remain stable.
 - **`needs_files` gate**: Tasks where the rubric expects file deliverables will fail if no files are produced, triggering a retry.
 - **Resume behavior**: Step 2 saves progress after each task. Re-running the same condition resumes from `workspace/step2_inference_progress.json`, only re-executing `error`/`qa_failed` tasks.
 - **HF upload**: Step 7 uses `delete_patterns` to wipe `data/**` and `deliverable_files/**` before uploading. `reference_files/**` is excluded. `results/<experiment_id>/report/` is included in the upload so the dashboard can read `report_data.json` directly from HuggingFace.

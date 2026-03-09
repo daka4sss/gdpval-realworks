@@ -116,6 +116,7 @@ SUBPROCESS_MEMORY_GB = int(os.getenv("SUBPROCESS_MEMORY_GB", "5"))  # subprocess
 # Azure AI 모델 (모두 AzureOpenAI SDK로 호출)
 SUPPORTED_MODELS = [
     "gpt-5.2-chat",       # Azure OpenAI — GPT-5.2
+    "gpt-5.4",            # Azure OpenAI — GPT-5.4
     "gpt-4o",             # Azure OpenAI — GPT-4o
     "grok-3",             # Azure AI — xAI Grok-3
     "claude-3.5-sonnet",  # Azure AI — Anthropic Claude

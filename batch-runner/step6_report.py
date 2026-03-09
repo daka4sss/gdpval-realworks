@@ -151,6 +151,7 @@ def _generate_narrative(data: dict, summary: dict, sector_breakdown: list[dict])
         "failure_patterns": "",
         "recommendations": "",
     }
+    narrative_language = "Japanese"
 
     try:
         from core.llm_client import create_client, complete
@@ -187,6 +188,8 @@ Sector breakdown:
 {sector_lines}
 
 IMPORTANT CONSTRAINTS:
+- Write ALL narrative values in Japanese.
+- Keep the JSON keys exactly as provided in English.
 - Grading scores do NOT exist yet. Do NOT mention or predict grades.
 - Focus ONLY on: task completion, Self-QA scores, latency patterns, sector/occupation observations, deliverable file generation quality.
 - Write as a technical evaluator, NOT a marketer.
@@ -194,14 +197,20 @@ IMPORTANT CONSTRAINTS:
 
 Return ONLY valid JSON with these exact keys (no markdown code fences):
 {{
-  "overview": "2-3 paragraphs describing: what experiment was run, the task execution outcomes based on Self-QA confidence scores, and key highlights. IMPORTANT: These are self-assessed scores from the LLM during execution, NOT external grading results. Frame accordingly — use language like 'self-assessed confidence', 'task completion rate', 'LLM-evaluated quality' rather than 'performance score' or 'grading result'.",
-  "quality_analysis": "2-3 paragraphs: QA score patterns, notable issues, occupation/sector observations",
-  "failure_patterns": "Analysis of errors and retries. Empty string if no failures.",
-  "recommendations": "2-3 actionable suggestions for improving the next experiment run"
+    "overview": "2-3 paragraphs in {narrative_language} describing: what experiment was run, the task execution outcomes based on Self-QA confidence scores, and key highlights. IMPORTANT: These are self-assessed scores from the LLM during execution, NOT external grading results. Frame accordingly — use language like 'self-assessed confidence', 'task completion rate', 'LLM-evaluated quality' rather than 'performance score' or 'grading result'.",
+    "quality_analysis": "2-3 paragraphs in {narrative_language}: QA score patterns, notable issues, occupation/sector observations",
+    "failure_patterns": "Analysis of errors and retries in {narrative_language}. Empty string if no failures.",
+    "recommendations": "2-3 actionable suggestions in {narrative_language} for improving the next experiment run"
 }}"""
 
         messages = [
-            {"role": "system", "content": "You are a precise technical evaluator. Return only valid JSON."},
+                        {
+                                "role": "system",
+                                "content": (
+                                        "You are a precise technical evaluator. Return only valid JSON. "
+                                        "Write all JSON values in Japanese while preserving the JSON keys in English."
+                                ),
+                        },
             {"role": "user", "content": prompt_content},
         ]
 
